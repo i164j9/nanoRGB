@@ -6,7 +6,7 @@
 
   the firePallet and Fire2012WithPalette demos are excluded in the list because
   they do no look good on the longer led strips, you can add them if you choose
-  see the comment at the end of line 78
+  see the comment at the end of line 79
 */
 
 #include <./FastLED/src/FastLED.h>
@@ -308,7 +308,7 @@ void bpm()
   uint8_t BeatsPerMinute = 120;
   CRGBPalette16 palette = PartyColors_p;
   uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
-  for( int i = 0; i < NUM_LEDS; i++) { //9948
+  for( int i = 0; i < NUM_LEDS; i++) {
     leds[i] = ColorFromPalette(palette, gHue+(i*2), beat-gHue+(i*10));
   }
 }
