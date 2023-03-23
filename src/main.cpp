@@ -1,18 +1,31 @@
+/*
+  This encapsulates all of the individual FastLED examples
+  unfortunately on smaller atmega mcus you cannot run more
+  than 300 leds most notabley on the atmega328p this is
+  best suited for an esp32, teensy 3 and above
+
+  the firePallet and Fire2012WithPalette demos are excluded in the list because
+  they do no look good on the longer led strips, you can add them if you choose
+  see the comment at the end of line 78
+*/
+
 #include <./FastLED/src/FastLED.h>
 #include "Arduino.h"
-
 
 #if FASTLED_VERSION < 3001000
 #error "Requires FastLED 3.1 or later; check github for latest code."
 #endif
 
 FASTLED_USING_NAMESPACE
+// the time in seconds that each pattern runs before changing
+#define patternDuration   60
 //#define FASTLED_ALLOW_INTERRUPTS 0
 #define DATA_PIN            4
 #define NUM_LEDS            300
 #define LED_TYPE            WS2812B
 #define COLOR_ORDER         RGB
 #define FRAMES_PER_SECOND   120
+// led intesity
 #define BRIGHTNESS  255
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 #define REF 700   // reference for big sound
@@ -63,16 +76,18 @@ void vu();
 
 // List of patterns to cycle through.  Each is defined as a separate function below.
 typedef void (*SimplePatternList[])();
-SimplePatternList gPatterns = { singlePixelChaser, sinelon, juggle, bpm, pride, pacifica, rainbowWithGlitter, rainbow, confetti };
-uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
-uint8_t gHue = 0; // rotating "base color" used by many of the patterns
+SimplePatternList gPatterns = { singlePixelChaser, sinelon, juggle, bpm, pride, pacifica, rainbowWithGlitter, rainbow, confetti };//, firePallet, Fire2012WithPalette };
+// Index number of which pattern is current
+uint8_t gCurrentPatternNumber = 0;
+// rotating "base color" used by many of the patterns
+uint8_t gHue = 0;
 CRGBPalette16 gPal;
 bool gReverseDirection = false;
 
 void setup()
 {
-
-  delay(2000); // 3 second delay for boot recovery, and a moment of silence
+  // 3 second delay for boot recovery, and a moment of silence
+  delay(2000);
  
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS)
         .setCorrection( TypicalLEDStrip ).setDither(BRIGHTNESS < 255);
@@ -97,7 +112,6 @@ void setup()
 
 void loop()
 {
-  //vu();
   demoReel();
   FastLED.show();
 }
@@ -134,8 +148,10 @@ void demoReel(){
   FastLED.delay(1000/FRAMES_PER_SECOND); 
 
   // do some periodic updates
-  EVERY_N_MILLISECONDS( 20 ) { gHue++; } // slowly cycle the "base color" through the rainbow
-  EVERY_N_SECONDS( 60 ) { nextPattern(); } // change patterns periodically
+  // slowly cycle the "base color" through the rainbow
+  EVERY_N_MILLISECONDS( 20 ) { gHue++; }
+  // change patterns periodically
+  EVERY_N_SECONDS( patternDuration ) { nextPattern(); }
 }
 
 
@@ -354,7 +370,7 @@ void pride()
 void singlePixelChaser(){
   
 // Move a single white led 
-   for(int whiteLed = 0; whiteLed < NUM_LEDS; whiteLed = whiteLed + 1) {
+   for(int whiteLed = 0; whiteLed < NUM_LEDS; whiteLed++) {
       fadeToBlackBy(leds,NUM_LEDS,10);
       // Turn our current led on to white, then show the leds
       leds[whiteLed] = CHSV(gHue, 255, 180);
@@ -367,7 +383,8 @@ void singlePixelChaser(){
 
       // Turn our current led back to black for the next loop around
       //leds[whiteLed] = CRGB::Black;
-      EVERY_N_MILLISECONDS( 20 ) { gHue++; } // slowly cycle the "base color" through the rainbow
+      // slowly cycle the "base color" through the rainbow
+      EVERY_N_MILLISECONDS( 20 ) { gHue++; }
    }
 }
 
@@ -424,9 +441,7 @@ void firePallet() {
   //   CRGB lightcolor = CHSV(hue,128,255); // half 'whitened', full brightness
   //   gPal = CRGBPalette16( CRGB::Black, darkcolor, lightcolor, CRGB::White);
 
-
-  Fire2012WithPalette(); // run simulation frame, using palette colors
-  
-  FastLED.show(); // display this frame
   FastLED.delay(1000 / FRAMES_PER_SECOND);
+   // run simulation frame, using palette colors
+  Fire2012WithPalette();
 }
