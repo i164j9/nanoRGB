@@ -85,7 +85,7 @@ typedef void (*SimplePatternList[])();
 SimplePatternList gPatterns = { signChaser, rainbowCycle, singlePixelChaser, sinelon, juggle, bpm,
                                 pride, glitterWithHue, pacifica, rainbowWithGlitter, confetti, rainbow,
                                 glitter, };//, firePallet, Fire2012WithPalette };
-                                
+
 // Index number of which pattern is current
 uint8_t gCurrentPatternNumber = 0;
 // rotating "base color" used by many of the patterns
@@ -410,7 +410,6 @@ void singlePixelChaser(){
    }
 }
 
-
 void Fire2012WithPalette()
 {
 // Array of temperature readings at each simulation cell
@@ -467,7 +466,6 @@ void firePallet() {
    // run simulation frame, using palette colors
   Fire2012WithPalette();
 }
-
 
 void signChaser(){
   for (int j = 0; j < 255; j++)
