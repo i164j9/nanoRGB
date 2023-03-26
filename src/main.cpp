@@ -6,11 +6,11 @@
 
   the firePallet and Fire2012WithPalette demos are excluded in the list because
   they do no look good on the longer led strips, you can add them if you choose
-  see the comment at the end of line 79
+  see the comment at the end of line 83
 */
 
-#include <./FastLED/src/FastLED.h>
-#include "Arduino.h"
+#include "FastLED/src/FastLED.h"
+//#include "Arduino.h"
 
 #if FASTLED_VERSION < 3001000
 #error "Requires FastLED 3.1 or later; check github for latest code."
@@ -18,18 +18,18 @@
 
 FASTLED_USING_NAMESPACE
 // the time in seconds that each pattern runs before changing
-#define patternDuration   60
+#define patternDuration   30
 //#define FASTLED_ALLOW_INTERRUPTS 0
-#define DATA_PIN            4
+#define DATA_PIN            18
 #define NUM_LEDS            300
 #define LED_TYPE            WS2812B
 #define COLOR_ORDER         RGB
 #define FRAMES_PER_SECOND   120
 // led intesity
-#define BRIGHTNESS  255
+#define BRIGHTNESS  128
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 #define REF 700   // reference for big sound
-
+#define N_MILLISECONDS  20
 // Looks best on a high-density LED setup (60+ pixels/meter).
 //
 //
@@ -47,8 +47,9 @@ FASTLED_USING_NAMESPACE
 // Default 120, suggested range 50-200.
 #define SPARKING 120
 
-CRGB leds[NUM_LEDS];
+CRGB *leds = new CRGB[NUM_LEDS];
 
+void resetLeds();
 void pacifica_loop();
 void pacifica_one_layer( CRGBPalette16& p, uint16_t cistart, uint16_t wavescale, uint8_t bri, uint16_t ioff);
 void pacifica_add_whitecaps();
@@ -62,7 +63,7 @@ void bpm();
 void sinelon();
 void confetti();
 void rainbowWithGlitter();
-void addGlitter( fract8 chanceOfGlitter);
+void addGlitter( fract8 );
 void rainbow();
 void nextPattern();
 void pride();
@@ -73,10 +74,18 @@ void demoReel();
 // it add it to the SimplePatternList below
 void firePallet(); 
 void vu();
+void signChaser();
+void rainbowCycle();
+void rainbowCycle(uint32_t);
+void glitter();
+void glitterWithHue();
 
 // List of patterns to cycle through.  Each is defined as a separate function below.
 typedef void (*SimplePatternList[])();
-SimplePatternList gPatterns = { singlePixelChaser, sinelon, juggle, bpm, pride, pacifica, rainbowWithGlitter, rainbow, confetti };//, firePallet, Fire2012WithPalette };
+SimplePatternList gPatterns = { signChaser, rainbowCycle, singlePixelChaser, sinelon, juggle, bpm,
+                                pride, glitterWithHue, pacifica, rainbowWithGlitter, confetti, rainbow,
+                                glitter, };//, firePallet, Fire2012WithPalette };
+                                
 // Index number of which pattern is current
 uint8_t gCurrentPatternNumber = 0;
 // rotating "base color" used by many of the patterns
@@ -86,8 +95,9 @@ bool gReverseDirection = false;
 
 void setup()
 {
+  Serial.begin(115200);
   // 3 second delay for boot recovery, and a moment of silence
-  delay(2000);
+  FastLED.delay(2000);
  
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS)
         .setCorrection( TypicalLEDStrip ).setDither(BRIGHTNESS < 255);
@@ -107,15 +117,31 @@ void setup()
   
   // Third, here's a simpler, three-step gradient, from black to red to white
   //   gPal = CRGBPalette16( CRGB::Black, CRGB::Red, CRGB::White);
+  resetLeds();
 }
-
 
 void loop()
 {
   demoReel();
-  FastLED.show();
+  //glitterWithHue();
+  //singlePixelChaser();
+  //signChaser();
 }
 
+void demoReel(){
+  // Call the current pattern function once, updating the 'leds' array
+  if(gCurrentPatternNumber == 7 || gCurrentPatternNumber == 12){
+    resetLeds();
+  }
+    gPatterns[gCurrentPatternNumber]();
+  // send the 'leds' array out to the actual LED strip
+
+  // insert a delay to keep the framerate modest
+  FastLED.delay(1000/FRAMES_PER_SECOND); 
+
+  // change patterns periodically
+  EVERY_N_SECONDS( patternDuration ) { nextPattern(); }
+}
 
 //broken - experimental idea
 void vu(){
@@ -129,44 +155,31 @@ void vu(){
   leds[pos] += CHSV( gHue, 255, 192);
 }
 
-
 void pacifica()
 {
-  EVERY_N_MILLISECONDS( 20 ) {
+  EVERY_N_MILLISECONDS( N_MILLISECONDS ) {
     pacifica_loop();
   }
 }
 
-
-void demoReel(){
-  // Call the current pattern function once, updating the 'leds' array
-  gPatterns[gCurrentPatternNumber]();
-
-  // send the 'leds' array out to the actual LED strip
-  FastLED.show();  
-  // insert a delay to keep the framerate modest
-  FastLED.delay(1000/FRAMES_PER_SECOND); 
-
-  // do some periodic updates
-  // slowly cycle the "base color" through the rainbow
-  EVERY_N_MILLISECONDS( 20 ) { gHue++; }
-  // change patterns periodically
-  EVERY_N_SECONDS( patternDuration ) { nextPattern(); }
+void resetLeds(){
+  for (int i = 0; i < NUM_LEDS; i++){
+      leds[i] = CHSV(0,0,0);
+    }
+    FastLED.show();
 }
-
 
 // These three custom blue-green color palettes were inspired by the colors found in
 // the waters off the southern coast of California, https://goo.gl/maps/QQgd97jjHesHZVxQ7
-CRGBPalette16 pacifica_palette_1 = 
-    { 0x000507, 0x000409, 0x00030B, 0x00030D, 0x000210, 0x000212, 0x000114, 0x000117, 
+CRGBPalette16 pacifica_palette_1 = {
+      0x000507, 0x000409, 0x00030B, 0x00030D, 0x000210, 0x000212, 0x000114, 0x000117, 
       0x000019, 0x00001C, 0x000026, 0x000031, 0x00003B, 0x000046, 0x14554B, 0x28AA50 };
-CRGBPalette16 pacifica_palette_2 = 
-    { 0x000507, 0x000409, 0x00030B, 0x00030D, 0x000210, 0x000212, 0x000114, 0x000117, 
+CRGBPalette16 pacifica_palette_2 = {
+      0x000507, 0x000409, 0x00030B, 0x00030D, 0x000210, 0x000212, 0x000114, 0x000117, 
       0x000019, 0x00001C, 0x000026, 0x000031, 0x00003B, 0x000046, 0x0C5F52, 0x19BE5F };
-CRGBPalette16 pacifica_palette_3 = 
-    { 0x000208, 0x00030E, 0x000514, 0x00061A, 0x000820, 0x000927, 0x000B2D, 0x000C33, 
+CRGBPalette16 pacifica_palette_3 = {
+      0x000208, 0x00030E, 0x000514, 0x00061A, 0x000820, 0x000927, 0x000B2D, 0x000C33, 
       0x000E39, 0x001040, 0x001450, 0x001860, 0x001C70, 0x002080, 0x1040BF, 0x2060FF };
-
 
 // Add one layer of waves into the led array
 void pacifica_one_layer( CRGBPalette16& p, uint16_t cistart, uint16_t wavescale, uint8_t bri, uint16_t ioff)
@@ -186,7 +199,6 @@ void pacifica_one_layer( CRGBPalette16& p, uint16_t cistart, uint16_t wavescale,
   }
 }
 
-
 // Add extra 'white' to areas where the four layers of light have lined up brightly
 void pacifica_add_whitecaps()
 {
@@ -205,7 +217,6 @@ void pacifica_add_whitecaps()
   }
 }
 
-
 // Deepen the blues and greens
 void pacifica_deepen_colors()
 {
@@ -215,7 +226,6 @@ void pacifica_deepen_colors()
     leds[i] |= CRGB( 2, 5, 7);
   }
 }
-
 
 void pacifica_loop()
 {
@@ -252,20 +262,18 @@ void pacifica_loop()
   pacifica_deepen_colors();
 }
 
-
 void nextPattern()
 {
   // add one to the current pattern number, and wrap around at the end
   gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
 }
 
-
 void rainbow() 
 {
   // FastLED's built-in rainbow generator
   fill_rainbow( leds, NUM_LEDS, gHue, 7);
+  EVERY_N_MILLISECONDS( N_MILLISECONDS ) { gHue++; }
 }
-
 
 void addGlitter( fract8 chanceOfGlitter) 
 {
@@ -274,6 +282,32 @@ void addGlitter( fract8 chanceOfGlitter)
   }
 }
 
+void glitter() 
+{
+  fract8 chanceOfGlitter = 75;
+  if( random8() < chanceOfGlitter) {
+    int myrand = random16(NUM_LEDS);
+    leds[ myrand ] += CRGB::White;
+    FastLED.show();
+    FastLED.delay(10);
+    leds[myrand]= CRGB::Black;
+    FastLED.show();
+  }
+}
+
+void glitterWithHue() 
+{
+  gHue = random16(255);
+  fract8 chanceOfGlitter = 75;
+  if( random8() < chanceOfGlitter) {
+    int myrand = random16(NUM_LEDS);
+    leds[ myrand ] += CHSV(gHue, 255, 255);
+    FastLED.show();
+    FastLED.delay(10);
+    leds[ myrand ]= CRGB::Black;
+    FastLED.show();
+  }
+}
 
 void rainbowWithGlitter() 
 {
@@ -281,7 +315,6 @@ void rainbowWithGlitter()
   rainbow();
   addGlitter(80);
 }
-
 
 void confetti() 
 {
@@ -291,16 +324,14 @@ void confetti()
   leds[pos] += CHSV( gHue + random8(64), 200, 255);
 }
 
-
 void sinelon()
 {
   // a colored dot sweeping back and forth, with fading trails
-  fadeToBlackBy( leds, NUM_LEDS, 20);
+  fadeToBlackBy( leds, NUM_LEDS, 10);
   int pos = beatsin16( 13, 0, NUM_LEDS-1 );
-  Serial.println(pos);
   leds[pos] += CHSV( gHue, 255, 192);
+  EVERY_N_MILLISECONDS( N_MILLISECONDS ) { gHue++; }
 }
-
 
 void bpm()
 {
@@ -311,8 +342,9 @@ void bpm()
   for( int i = 0; i < NUM_LEDS; i++) {
     leds[i] = ColorFromPalette(palette, gHue+(i*2), beat-gHue+(i*10));
   }
+  FastLED.show();
+  EVERY_N_MILLISECONDS( N_MILLISECONDS ) { gHue++; }
 }
-
 
 void juggle() {
   // eight colored dots, weaving in and out of sync with each other
@@ -323,7 +355,6 @@ void juggle() {
     dothue += 32;
   }
 }
-
 
 void pride() 
 {
@@ -366,25 +397,16 @@ void pride()
   }
 }
 
-
-void singlePixelChaser(){
-  
+void singlePixelChaser(){  
 // Move a single white led 
-   for(int whiteLed = 0; whiteLed < NUM_LEDS; whiteLed++) {
-      fadeToBlackBy(leds,NUM_LEDS,10);
+   for(int ledPos = 0; ledPos < NUM_LEDS; ledPos++) {
+      fadeToBlackBy(leds,NUM_LEDS,255);
       // Turn our current led on to white, then show the leds
-      leds[whiteLed] = CHSV(gHue, 255, 180);
-
+      leds[ledPos] = CRGB(255, 255, 255);
       // Show the leds (only one of which is set to white, from above)
       FastLED.show();
-
       // Wait a little bit
       FastLED.delay(5);
-
-      // Turn our current led back to black for the next loop around
-      //leds[whiteLed] = CRGB::Black;
-      // slowly cycle the "base color" through the rainbow
-      EVERY_N_MILLISECONDS( 20 ) { gHue++; }
    }
 }
 
@@ -444,4 +466,57 @@ void firePallet() {
   FastLED.delay(1000 / FRAMES_PER_SECOND);
    // run simulation frame, using palette colors
   Fire2012WithPalette();
+}
+
+
+void signChaser(){
+  for (int j = 0; j < 255; j++)
+  { // cycle all 256 colors in the wheel
+    for (int q = 0; q < 3; q++)
+    {
+      for (uint16_t i = 0; i < NUM_LEDS; i=i+3)
+      {
+
+        leds[i+q] =CHSV((i+j)%255, 255, 180);
+      }
+      FastLED.show();
+      FastLED.delay(15);
+      for (uint16_t i = 0; i < NUM_LEDS; i=i+3)
+      {
+        leds[i+q] = CHSV(0, 0, 0);
+      }
+      FastLED.show();
+    }
+  } 
+}
+
+void rainbowCycle()
+{
+  uint16_t i, j;
+  // 5 cycles of all colors on wheel
+  for (j = 0; j < 256 * 5; j++)
+  {
+    for (i = 0; i < NUM_LEDS; i++)
+    {
+      //ring.setPixelColor(i, Wheel(((i * 256 / ring.numPixels()) + j) & 255));
+      leds[i] = CHSV(((i * 256 / NUM_LEDS) + j) & 255,255,180); 
+    }
+    FastLED.show();
+    //FastLED.delay(10);
+  }
+}
+
+void rainbowCycle(uint32_t dly)
+{
+  uint16_t i, j;
+  // 5 cycles of all colors on wheel
+  for (j = 0; j < 256 * 5; j++)
+  {
+    for (i = 0; i < NUM_LEDS; i++)
+    {
+      leds[i] = CHSV(((i * 256 / NUM_LEDS) + j) & 255,255,180); 
+    }
+    FastLED.show();
+    FastLED.delay(dly);
+  }
 }
